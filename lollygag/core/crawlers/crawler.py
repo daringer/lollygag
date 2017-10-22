@@ -9,7 +9,7 @@ from lollygag.dependency_injection.requirements import HasMethods, HasAttributes
 from lollygag.utility.observer.subject import Subject
 from lollygag.utility.url import get_protocol
 from lollygag.utility.url import strip_beginning_slashes
-from lollygag.utility.url import is_relative_link
+from lollygag.utility.url import is_relative_link, is_usable_link
 from lollygag.utility.url import get_domain
 
 
@@ -73,17 +73,14 @@ class Crawler(object):
         """
         Initialize the crawler's status field by a collection of urls
         """
-        self.protocol = get_protocol(urls[0])
-        if not self.protocol:
-            self.protocol = "http://"
-            urls[0] = "%s%s" % (self.protocol, urls[0])
-        self.status.urls_to_crawl.add(urls[0])
-        for url in urls[1:]:
-            processed = self.process_link(None, url)
-            if not processed:
-                raise AttributeError(
-                    "Url=[%s] is not valid in this collection!" % url)
-            self.status.urls_to_crawl.add(processed)
+        self.protocol = get_protocol(urls[0]) or "http://"
+        for url in urls:
+            link = self.process_link(None, url)
+            if link:
+                self.status.urls_to_crawl.add(link)
+            else:
+                self.log_service.warn("url: '{}' is not accepted for crawling")
+
 
     def crawl(self, url=None):
         """
@@ -94,7 +91,7 @@ class Crawler(object):
         """
         if url:
             self.reset(url)
-        self.log_service.info(
+        self.log_service.debug(
             "----------Crawl starting from url=[{url}]----------".format(
                 url=url)
         )
@@ -146,15 +143,32 @@ class Crawler(object):
         Processes a newly found link
         For relative links the origin link will be used as base
         """
+        self.log_service.debug("process link (from): ", link)
+        # check for usability of link 
+        if not is_usable_link(link):
+            return None
+        
+        # strip anchor symbol '#', if any are there (do not follow anchors)
+        link = link.split("#")[0]
+        
+        # search and return on to-be-skipped link-patterns
         if not link or any([x for x in self.config_service.skip if re.search(x, link.lower())]):
             return None
+        
+        # relative link means: <protocol><domain><link>
         if is_relative_link(link):
             if link[0] == ".":
                 link = link[1::]
-            link = "%s%s%s" % (self.protocol, get_domain(origin), link)
+            domain = get_domain(origin)
+            if not domain.endswith("/") and not link.startswith("/"):
+                domain += "/"
+            link = "{}{}{}".format(self.protocol, domain, link)
+
+        # absolute link, <protocol><link>
         link = strip_beginning_slashes(link)
         if not get_protocol(link):
-            link = "%s%s" % (self.protocol, link)
+            link = "{}{}".format(self.protocol, link)
+        self.log_service.debug("process link (to): ", link)
         return link
 
     def get_status_message(self):
@@ -190,7 +204,7 @@ class Crawler(object):
         Calls on_interrupt obeservers
         Terminates pending jobs
         """
-        self.log_service.info(
+        self.log_service.debug(
             "----------Crawling was interrupted----------", error)
         self.on_interrupt.next()
         self.work_service.terminate_all()
@@ -204,5 +218,5 @@ class Crawler(object):
         self.on_finish.next(self.status.visited_urls,
                             self.status.urls_in_progress,
                             self.status.urls_to_crawl)
-        self.log_service.info(self.get_status_message())
-        self.log_service.info("----------Crawl finished----------\n")
+        self.log_service.debug(self.get_status_message())
+        self.log_service.debug("----------Crawl finished----------\n")
