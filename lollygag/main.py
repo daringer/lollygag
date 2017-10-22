@@ -21,18 +21,19 @@ def run(**kwargs):
     register_services()
     config = Inject("config_service").request()
     config.setup()
-    url = kwargs.get('url', config.urls)
-    if len(url) == 1:
-        url = url[0]
     subscriber = None
+    urls = sum(config.urls, [])
+    
     if 'subscribe' in kwargs:
         subscriber = lambda crawler: subscribe_to_crawler(crawler, **kwargs['subscribe'])
-    if not url or not isinstance(url, list):
-        crawler = get_crawler(subscriber, **kwargs)
-        crawler.crawl(url)
-    else:
-        url_list_kwargs = {k: kwargs[k] for k in kwargs if k != 'url'}
-        crawl_url_list(url, subscriber, **url_list_kwargs)
+        
+    if not urls or len(urls) == 0:
+        print("Cannot start crawling without (at least one) target url")
+        print("exiting...")
+        return
+
+    url_list_kwargs = {k: kwargs[k] for k in kwargs if k != 'url'}
+    crawl_url_list(urls, subscriber, **url_list_kwargs)
 
 
 def crawl_url_list(url, event_register=None, **kwargs):
