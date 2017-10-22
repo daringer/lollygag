@@ -26,7 +26,7 @@ class LinkParser(HTMLParser, Parser):
         """
         self._links = set()
         result = Parser.parse(self, url)
-        self.log_service.info("Link=[%s] StatusCode=[%s] Size=[%s]"
+        self.log_service.debug("Link=[%s] StatusCode=[%s] Size=[%s]"
                               % (result.link, result.status_code, result.page_size))
         return ParseResult(link=result.link,
                            status_code=result.status_code,
