@@ -8,6 +8,7 @@ DEFAULT_CONFIG = {
     'threads': 10,
     'loglevel': 'all',
     'urls': '',
+    'verify-ssl': True,
     'skip': [
         r'\.pdf$',
         r'\.jpg$',
@@ -36,6 +37,7 @@ class ConfigService(object):
     loglevel = DEFAULT_CONFIG['loglevel']
     urls = DEFAULT_CONFIG['urls']
     skip = DEFAULT_CONFIG['skip']
+    verify_ssl = DEFAULT_CONFIG['verify-ssl']
 
     def __init__(self):
         self.__dict__ = ConfigService.state
@@ -67,7 +69,8 @@ class ConfigService(object):
             'urls': "Base url(s) you wish to crawl",
             'threads': "Maximum number of concurrent threads",
             'loglevel': "Level of logging [all, info, debug, warn, error, none]",
-            'skip': "Regex patterns, when any of them is found in the url, it's skipped"
+            'skip': "Regex patterns, when any of them is found in the url, it's skipped",
+            'verify-ssl': "Certificates for https:// urls are verified"
         }
         self.argumentParser.add_argument("--urls", "-u", nargs="+",
                                          help=helps['urls'],
@@ -80,4 +83,7 @@ class ConfigService(object):
                                          required=False)
         self.argumentParser.add_argument("--skip", "-s",
                                          help=helps['skip'],
+                                         required=False)
+        self.argumentParser.add_argument("--verify-ssl", "-v", 
+                                         help=helps['verify-ssl'],
                                          required=False)
