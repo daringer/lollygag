@@ -49,41 +49,32 @@ class ConfigService(object):
         """
         if not ConfigService.state:
             self.__init_args()
-            args = self.__parse_args()
-            for key in args:
-                ConfigService.state[key] = args[key]
-
-    def __parse_args(self):
-        arguments = self.argumentParser.parse_args()
-        config = {}
-        for key in DEFAULT_CONFIG:
-            attr = getattr(arguments, key, None)
-            if attr:
-                config[key] = attr
-            else:
-                config[key] = DEFAULT_CONFIG[key]
-        return config
+            args = self.argumentParser.parse_args().__dict__
+            ConfigService.state.update(args)
 
     def __init_args(self):
+        avail_logs = ["all", "debug", "info", "warn", "error", "none"]
         helps = {
             'urls': "Base url(s) you wish to crawl",
             'threads': "Maximum number of concurrent threads",
-            'loglevel': "Level of logging [all, info, debug, warn, error, none]",
+            'loglevel': "Level of logging [{}]".format(", ".join(avail_logs)),
             'skip': "Regex patterns, when any of them is found in the url, it's skipped",
             'verify-ssl': "Certificates for https:// urls are verified"
         }
-        self.argumentParser.add_argument("--urls", "-u", nargs="+",
-                                         help=helps['urls'],
-                                         required=False)
-        self.argumentParser.add_argument("--threads", "-t",
-                                         help=helps['threads'],
-                                         required=False)
-        self.argumentParser.add_argument("--loglevel", "-l",
-                                         help=helps['loglevel'],
-                                         required=False)
+        self.argumentParser.add_argument("urls", nargs="*", metavar="urls", 
+                                         action="append", help=helps['urls'])
+        self.argumentParser.add_argument("--urls", "-u", nargs="*", metavar="urls", 
+                                         action="append", help=helps['urls'] + " (legacy)")
+
+        self.argumentParser.add_argument("--threads", "-t", nargs="?", const=int,
+                                         default=DEFAULT_CONFIG['threads'],
+                                         help=helps['threads'], required=False)
+        self.argumentParser.add_argument("--loglevel", "-l", choices=avail_logs,
+                                         default=DEFAULT_CONFIG['loglevel'],
+                                         help=helps['loglevel'], required=False)
         self.argumentParser.add_argument("--skip", "-s",
-                                         help=helps['skip'],
-                                         required=False)
-        self.argumentParser.add_argument("--verify-ssl", "-v", 
-                                         help=helps['verify-ssl'],
-                                         required=False)
+                                         default=DEFAULT_CONFIG['skip'],
+                                         help=helps['skip'], required=False)
+        self.argumentParser.add_argument("--verify-ssl", "-v", action="store_false",
+                                         default=DEFAULT_CONFIG['verify-ssl'],
+                                         help=helps['verify-ssl'], required=False)
