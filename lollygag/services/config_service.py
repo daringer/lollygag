@@ -50,6 +50,10 @@ class ConfigService(object):
         if not ConfigService.state:
             self.__init_args()
             args = self.argumentParser.parse_args().__dict__
+            
+            # just as long as '-u' is kept as legacy cmdline-arg
+            args["urls"] = sum(args.get("urls", []), [])
+
             ConfigService.state.update(args)
 
     def __init_args(self):
@@ -61,10 +65,10 @@ class ConfigService(object):
             'skip': "Regex patterns, when any of them is found in the url, it's skipped",
             'verify-ssl': "Certificates for https:// urls are verified"
         }
-        self.argumentParser.add_argument("urls", nargs="*", metavar="urls", 
-                                         action="append", help=helps['urls'])
-        self.argumentParser.add_argument("--urls", "-u", nargs="*", metavar="urls", 
-                                         action="append", help=helps['urls'] + " (legacy)")
+        self.argumentParser.add_argument("urls", nargs="*", action="append", 
+                                         metavar="urls", help=helps['urls'])
+        self.argumentParser.add_argument("--urls", "-u", nargs="*", action="append", 
+                                         metavar="urls", help=helps['urls'] + " (legacy)")
 
         self.argumentParser.add_argument("--threads", "-t", nargs="?", const=int,
                                          default=DEFAULT_CONFIG['threads'],
