@@ -5,6 +5,7 @@ Holds the run method.
 import time
 from lollygag.utility.url import get_domain
 from lollygag.services import register_services
+from lollygag.dependency_injection.requirements import HasMethods
 from lollygag.dependency_injection.inject import Inject
 
 
@@ -21,18 +22,22 @@ def run(**kwargs):
     register_services()
     config = Inject("config_service").request()
     config.setup()
+    log = Inject("log_service", HasMethods("info", "error", "debug")).request()
     subscriber = None
-    urls = sum(config.urls, [])
-    
+
+    # feed cmdline urls + kwargs-passed ones, if there're any
+    urls = config.urls + ([kwargs.get("url")] if "url" in kwargs else [])
+    # subscribe given callbacks to crawler-events
     if 'subscribe' in kwargs:
         subscriber = lambda crawler: subscribe_to_crawler(crawler, **kwargs['subscribe'])
-        
+    
+    # on not-existing url, exit early!
     if not urls or len(urls) == 0:
-        print("Cannot start crawling without (at least one) target url")
-        print("exiting...")
-        return
+        log.error("Cannot start crawling without (at least one) target url")
+        log.error("exiting...(try '-h' for usage) \n")
+        return 
 
-    url_list_kwargs = {k: kwargs[k] for k in kwargs if k != 'url'}
+    url_list_kwargs = {k: kwargs[k] for k in kwargs if k != "url"}
     crawl_url_list(urls, subscriber, **url_list_kwargs)
 
 
@@ -46,12 +51,13 @@ def crawl_url_list(url, event_register=None, **kwargs):
     work_service = Inject('work_service', cache=False).request()
     domains = separate_urls_by_domain(url)
     jobs = Inject("queue").request()
-    for domain in domains:
+    for domain, paths in domains.items():
         crawler = get_crawler(event_register, **kwargs)
         crawler.on_finish(lambda *a, **kw: jobs.get())
-        job = get_crawl_job(crawler, domains[domain])
-        work_service.request_work(job)
-        jobs.put(1)
+        for path in paths:
+            job = get_crawl_job(crawler, path)
+            work_service.request_work(job)
+            jobs.put(1)
     while not jobs.empty():
         time.sleep(1)
 
@@ -71,9 +77,9 @@ def separate_urls_by_domain(urls):
     result = {}
     for url in urls:
         domain = get_domain(url)
-        if domain not in result:
-            result[domain] = []
-        result[domain].append(url)
+        #if domain not in result:
+        #    result[domain] = []
+        result.setdefault(domain, []).append(url)
     return result
 
 
