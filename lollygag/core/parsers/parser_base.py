@@ -3,7 +3,7 @@ Holds the Parser class.
 """
 from collections import namedtuple
 from lollygag.dependency_injection.inject import Inject
-from lollygag.dependency_injection.requirements import HasMethods
+from lollygag.dependency_injection.requirements import HasMethods, HasAttributes
 
 ParseResult = namedtuple("ParseResult", ["link", "status_code", "page_size"])
 
@@ -16,14 +16,17 @@ class Parser(object):
     """
     _requests = Inject("requests", HasMethods("get"))
     log_service = Inject("log_service", HasMethods("debug", "info", "error", "warn"))
-
+    config = Inject("config_service", HasAttributes("verify_ssl"))
+    
     def parse(self, url):
         """
         Send a GET request to the given url and parse the response.
         :returns: ParseResult containing the link, status_code and page_size of the result
         """
+        
+        
         assert url is not None
-        response = self._requests.get(url, verify=False)
+        response = self._requests.get(url, verify=self.config.verify_ssl)
         if response.status_code == 200:
             self.feed(response.text)
         return ParseResult(link=url,
