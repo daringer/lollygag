@@ -47,7 +47,7 @@ class MyParser(LinkParser):
 Services.site_parser_factory = MyParser
 
 # set `crawler_factory` and set 'max_depth' for crawling
-MapperCrawler.max_depth = 2
+MapperCrawler.max_depth = 3
 Services.crawler_factory = MapperCrawler
 # before crawling, let's subscribe to some crawler events:
 # 3 events may get callbacks (with following function-prototypes):
@@ -58,8 +58,8 @@ callbacks = {
     "on_start": lambda url: print("[START] crawling: {}".format(url)),
     "on_interrupt": lambda: print("[INTERRUPTED]"),
     "on_finish": lambda visited, ongoing, todo: \
-        print("\n[FINISH] #seen: {},\n #ongoing: {},\n #todo: {}".format(
-            len(visited), len(ongoing), len(todo)))
+        print("[FINISH] #seen: {}, #really_seen: {}, #ongoing: {}, #todo: {}". \
+            format(len(visited), 0, len(ongoing), len(todo)))
 }
 
 # now start

@@ -54,7 +54,9 @@ class Crawler(object):
         self.on_start = Subject()
         self.on_interrupt = Subject()
         self.on_finish = Subject()
-        self.protocol = None
+        
+        self.protocol = "http://"
+        
         self.status = CrawlerStatus()
         self.reset(urls)
 
@@ -62,7 +64,10 @@ class Crawler(object):
         """
         Reset the crawler's state
         """
+        # is this really thread-safe ? we have Queue() for that?
+        # @fixme: could be the reason why 'is_new_link()' seems not to work!
         self.status.reset(set(), set(), [])
+
         if not url:
             return
         if not isinstance(url, list):
@@ -73,14 +78,10 @@ class Crawler(object):
         """
         Initialize the crawler's status field by a collection of urls
         """
-        self.protocol = get_protocol(urls[0]) or "http://"
-        for url in urls:
-            link = self.process_link(None, url)
-            if link:
-                self.status.urls_to_crawl.add(link)
-            else:
-                self.log_service.warn("url: '{}' is not accepted for crawling")
-
+        for link in self.process_links(None, urls):
+            if link is None:
+               self.log_service.warn(
+                   "url: '{}' is not accepted for crawling".format(url))
 
     def crawl(self, url=None):
         """
@@ -143,32 +144,39 @@ class Crawler(object):
         Processes a newly found link
         For relative links the origin link will be used as base
         """
-        self.log_service.debug("process link (from): ", link)
+
+        org_link = link
         # check for usability of link 
         if not is_usable_link(link):
+            self.log_service.debug("link[not-usable]: {}".format(link))
             return None
         
-        # strip anchor symbol '#', if any are there (do not follow anchors)
+        # strip anchor symbol '#' (+name), do not follow (file-only) anchors
         link = link.split("#")[0]
         
         # search and return on to-be-skipped link-patterns
-        if not link or any([x for x in self.config_service.skip if re.search(x, link.lower())]):
+        if not link or any([x for x in self.config_service.skip \
+                if re.search(x, link.lower())]):
+            self.log_service.debug("link[skip]: {}".format(link))
             return None
         
         # relative link means: <protocol><domain><link>
-        if is_relative_link(link):
+        if is_relative_link(link) and origin:
             if link[0] == ".":
                 link = link[1::]
             domain = get_domain(origin)
             if not domain.endswith("/") and not link.startswith("/"):
                 domain += "/"
             link = "{}{}{}".format(self.protocol, domain, link)
+            self.log_service.debug("link[rel]: {} -> {}".format(org_link, link))
+            return link
 
         # absolute link, <protocol><link>
         link = strip_beginning_slashes(link)
-        if not get_protocol(link):
-            link = "{}{}".format(self.protocol, link)
-        self.log_service.debug("process link (to): ", link)
+        prot = get_protocol(link) or self.protocol 
+        link = link[len(prot):] if link.startswith(prot) else link
+        link = "{}{}".format(prot, link)
+        self.log_service.debug("link[abs]: {} -> {}".format(org_link, link))
         return link
 
     def get_status_message(self):
