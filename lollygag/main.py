@@ -8,6 +8,9 @@ from lollygag.services import register_services
 from lollygag.dependency_injection.requirements import HasMethods
 from lollygag.dependency_injection.inject import Inject
 
+class GlobalStorage(object):
+    crawlers = []
+
 
 def run(**kwargs):
     """
@@ -77,8 +80,6 @@ def separate_urls_by_domain(urls):
     result = {}
     for url in urls:
         domain = get_domain(url)
-        #if domain not in result:
-        #    result[domain] = []
         result.setdefault(domain, []).append(url)
     return result
 
@@ -93,6 +94,10 @@ def get_crawler(subscriber=None, **kwargs):
     crawler = factory()
     if subscriber:
         subscriber(crawler)
+
+    # globally save crawler instance for post-access and pickle
+    GlobalStorage.crawlers.append(crawler)
+
     return crawler
 
 

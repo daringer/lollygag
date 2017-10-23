@@ -12,7 +12,7 @@ class Node(object):
     def __init__(self, name, parent=None):
         self.name = name 
         self.parent = parent
-        self.children = {} #set()
+        self.children = {} 
 
         if parent is None:
             self.root = self 
@@ -21,31 +21,42 @@ class Node(object):
             self.root = parent.root 
             self.depth = parent.depth + 1
 
-    def add(self, name):
-        """Add node named: 'name' as child to 'self'"""
-        node = Node(name, self)
-        self.children[name] = node
-        self.root.visited.add(name)
-        return node
+    def extend(self, nodes):
+        """Extend 'children' with 'nodes'""" 
+        #return map(self.add, nodes)
+        for n in nodes:
+            self.add(n)
 
+    def add(self, node):
+        """'node' added to 'children'"""
+        
+        dist = self.root.dist
+        name2node = self.root.name_node
+        q = node.name
+
+        # node (link) already mapped and dist < new-dist!
+        if q in dist and self.depth + 1 > dist.get(q):
+            return None
+
+        node.parent = self
+        node.root = self.root
+        self.children[q] = node
+        name2node[q] = node
+        dist[q] = self.depth + 1
+        return node
+        
     def search(self, name):
-        """Search 'name' in all children (breadth-first)"""
+        """Search 'name'"""
         if name == self.name:
           return self
-
-        #match = lambda n: n.name == name
-        #res = list(filter(match, self.children) or \
-         #          filter(bool, map(n.search(name), self.children)) )
-        #return res.pop() if len(res) > 0 else None
-        res = list([self.children.get(name)] or \
-            filter(bool, map(lambda n: n.search(name), self.children.values())))
-        return res.pop() if len(res) > 0 else None
+        return self.root.name_node.get(name)
 
 class RootNode(Node):
     """Single difference to regular 'Node', global visited-links-index"""
     def __init__(self, name):
       super(RootNode, self).__init__(name, None)
-      self.visited = set()
+      self.name_node = {}
+      self.dist = {}
 
 class MapperCrawler(Crawler):
     """
@@ -53,7 +64,6 @@ class MapperCrawler(Crawler):
     """
 
     max_depth = None
-    max_children = None
 
     def __init__(self, *args, **kwargs):
         super(MapperCrawler, self).__init__(*args, **kwargs)
@@ -66,49 +76,29 @@ class MapperCrawler(Crawler):
         super(MapperCrawler, self).reset(url)
         self.tree = RootNode(url)
 
-    def process_link(self, origin, link):
+    def process_links(self, origin, links):
         """
         Adds the processed links from super to the graph.
         """
-        #print ("FROM: {} TO: {}".format(origin, link)) 
-        
-        #if link is None:
-        #  return None
-
         # create root-node, if not existing
         root = RootNode(origin) if self.tree is None else self.tree
 
-        # get origin-node, 
-        p_node = root
-        if origin != p_node.name:
-            p_node = root.search(origin)
-            if p_node is None:
-              p_node = root.add(origin)
+        p_node = root.search(origin) or Node(origin, root)
+        # max-depth constraint:
+        if p_node.depth + 1 > self.max_depth:
+            return []
         
-        result = super(MapperCrawler, self).process_link(origin, link)
-        if result is None: 
-            #print ("OUT NO RESULT", result)
-            return None
+        # make canonical link (process_link) and check if-visited 
+        # (@todo: this 'is_new_link()' seems not to work correctly)
+        #         might be a threading issue or simply me not understanding it...
+        out = []
+        for link in links:
+            uri = super(MapperCrawler, self).process_link(origin, link)
+            if self.is_new_link(uri):
+                out.append(uri)
+        self.status.urls_to_crawl |= set(out) 
+        p_node.extend( map(lambda n: Node(n, p_node), out) )
         
-        if not p_node:
-          #print ("OUT NO ORIGIN-NODE")
-          return None
+        print (len(root.name_node), len(self.status.visited_urls))
 
-        # already in database (technically one should ask self.root)
-        if result in root.visited:
-          #self.seen = 1 if not hasattr(self, "seen") else self.seen + 1
-          #print ("OUT ALREADY SEEN", result, self.seen)
-          return None
-        
-        # children max reached?
-        if self.max_children and self.max_children <= len(p_node.children):
-          #print ("OUT MAX CHILDREN", p_node.name, len(p_node.children))
-          return None
-
-        # new location
-        node = p_node.add(result)
-        if node.depth == self.max_depth:
-          #print ("OUT DEPTH", node.depth, result)
-          return None
-        #print ("IN", node.depth, "CHILDREN #:", len(node.children), result)
-        return result
+        return out
