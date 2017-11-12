@@ -7,7 +7,7 @@ response = Any(text="", status_code=404, content="")
 requests = Any(get=lambda x, **kw: response)
 log_service = Any(info=lambda *a, **kw: None, debug=lambda *a,
                   **kw: None, error=lambda *a, **kw: None, warn=lambda *a, **kw: None)
-
+config = Any(verify_ssl=lambda: True)
 
 class CanCreateLinkCrawler(unittest.TestCase):
     def test_can_initialize(self):
@@ -20,6 +20,7 @@ class LinkCrawlerCrawlTests(unittest.TestCase):
         Inject.reset()
         Inject.register_feature("requests", requests)
         Inject.register_feature("log_service", log_service)
+        Inject.register_feature("config_service", config)
 
     def tearDown(self):
         Inject.reset()
