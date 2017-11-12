@@ -23,11 +23,11 @@ def run(**kwargs):
     config.setup()
     subscriber = None
     urls = sum(config.urls, [])
-    
+
     if 'subscribe' in kwargs:
         subscriber = lambda crawler: subscribe_to_crawler(crawler, **kwargs['subscribe'])
-        
-    if not urls or len(urls) == 0:
+
+    if not urls:
         print("Cannot start crawling without (at least one) target url")
         print("exiting...")
         return
